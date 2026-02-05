@@ -992,7 +992,9 @@ Buffer::Iterator::Write(It first, It last)
     }
 
     const auto dist = std::distance(first, last);
-    NS_ASSERT(dist >= 0);
+    NS_ASSERT_MSG(dist >= 0,
+                  "Buffer::Iterator::Write() called with an invalid range (first > last)");
+
     const uint32_t size = static_cast<uint32_t>(dist);
 
     NS_ASSERT_MSG(CheckNoZero(m_current, m_current + size), GetWriteErrorMessage());
