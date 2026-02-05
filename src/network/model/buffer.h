@@ -10,14 +10,26 @@
 
 #include "ns3/assert.h"
 
+#include <algorithm>
+#include <concepts>
+#include <iterator>
 #include <ostream>
 #include <stdint.h>
+#include <type_traits>
 #include <vector>
 
 #define BUFFER_FREE_LIST 1
 
 namespace ns3
 {
+
+/**
+ * @brief Concept for forward iterators yielding uint8_t.
+ */
+template <typename It>
+concept Uint8tForwardIterator =
+    std::forward_iterator<It> &&
+    std::is_same_v<typename std::iterator_traits<It>::value_type, uint8_t>;
 
 /**
  * @ingroup packet
@@ -236,6 +248,16 @@ class Buffer
          */
         void Write(const uint8_t* buffer, uint32_t size);
         /**
+         * @param first start iterator of the data to write
+         * @param last end iterator of the data to write
+         *
+         * Write data from a container range into the buffer and advance
+         * the iterator position by the number of bytes written.
+         */
+        template <Uint8tForwardIterator It>
+        void Write(It first, It last);
+
+        /**
          * @param start the start of the data to copy
          * @param end the end of the data to copy
          *
@@ -347,6 +369,15 @@ class Buffer
          * bytes read.
          */
         void Read(uint8_t* buffer, uint32_t size);
+        /**
+         * @param first start iterator of the destination range
+         * @param last end iterator of the destination range
+         *
+         * Read data from the buffer into a container range and advance
+         * the iterator position by the number of bytes read.
+         */
+        template <Uint8tForwardIterator It>
+        void Read(It first, It last);
 
         /**
          * @param start start iterator of the buffer to copy data into
@@ -951,6 +982,27 @@ Buffer::Iterator::WriteHtonU32(uint32_t data)
     m_current += 4;
 }
 
+template <Uint8tForwardIterator It>
+void
+Buffer::Iterator::Write(It first, It last)
+{
+    if (first == last)
+    {
+        return;
+    }
+
+    const auto dist = std::distance(first, last);
+    NS_ASSERT(dist >= 0);
+    const uint32_t size = static_cast<uint32_t>(dist);
+
+    NS_ASSERT_MSG(CheckNoZero(m_current, m_current + size), GetWriteErrorMessage());
+
+    for (; first != last; ++first)
+    {
+        WriteU8(*first);
+    }
+}
+
 uint16_t
 Buffer::Iterator::ReadNtohU16()
 {
@@ -1051,6 +1103,16 @@ Buffer::Iterator::Read(Buffer::Iterator start, uint32_t size)
     end.Next(size);
 
     start.Write(*this, end);
+}
+
+template <Uint8tForwardIterator It>
+void
+Buffer::Iterator::Read(It first, It last)
+{
+    for (; first != last; ++first)
+    {
+        *first = ReadU8();
+    }
 }
 
 Buffer::Buffer(const Buffer& o)
