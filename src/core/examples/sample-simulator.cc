@@ -46,6 +46,10 @@ void
 MyModel::Start()
 {
     Simulator::Schedule(Seconds(10), &MyModel::HandleEvent, this, Simulator::Now().GetSeconds());
+    Simulator::Schedule(Seconds(11), [this]() {
+        std::cout << "Lambda in MyModel (object " << this << ") received event at "
+                  << Simulator::Now().GetSeconds() << "s" << std::endl;
+    });
 }
 
 void

@@ -39,6 +39,8 @@ def CancelledEvent():
 ns.cppyy.cppdef("""
     #include "CPyCppyy/API.h"
 
+    #include <iostream>
+
     using namespace ns3;
     /** Simple model object to illustrate event handling. */
     class MyModel
@@ -62,6 +64,11 @@ ns.cppyy.cppdef("""
       Simulator::Schedule (Seconds (10.0),
                            &MyModel::HandleEvent,
                            this, Simulator::Now ().GetSeconds ());
+      Simulator::Schedule(Seconds(11), [this]() {
+         std::cout << "Lambda in MyModel (object " << this << ") received event at "
+                   << Simulator::Now().GetSeconds() 
+                   << "s" << std::endl;
+     });
     }
     void
     MyModel::HandleEvent (double value)
