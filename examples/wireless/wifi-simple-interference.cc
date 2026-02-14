@@ -76,6 +76,8 @@
 #include "ns3/double.h"
 #include "ns3/internet-stack-helper.h"
 #include "ns3/ipv4-address-helper.h"
+#include "ns3/propagation-loss-model.h"
+#include "ns3/propagation-delay-model.h"
 #include "ns3/log.h"
 #include "ns3/mobility-helper.h"
 #include "ns3/mobility-model.h"
@@ -179,13 +181,23 @@ main(int argc, char* argv[])
     // ns-3 supports RadioTap and Prism tracing extensions for 802.11b
     wifiPhy.SetPcapDataLinkType(WifiPhyHelper::DLT_IEEE802_11_RADIO);
 
+    // Lock transmit power so that the configured losses map deterministically
+    // to the intended received powers (Prss/Irss).
+    constexpr double txPowerDbm = 16.0;
+    wifiPhy.Set("TxPowerStart", DoubleValue(txPowerDbm));
+    wifiPhy.Set("TxPowerEnd", DoubleValue(txPowerDbm));
+
     // Disable preamble detection model to receive signals below -82 dBm
     wifiPhy.DisablePreambleDetectionModel();
 
-    YansWifiChannelHelper wifiChannel;
-    wifiChannel.SetPropagationDelay("ns3::ConstantSpeedPropagationDelayModel");
-    wifiChannel.AddPropagationLoss("ns3::LogDistancePropagationLossModel");
-    wifiPhy.SetChannel(wifiChannel.Create());
+    Ptr<MatrixPropagationLossModel> matrixLoss = CreateObject<MatrixPropagationLossModel>();
+    Ptr<ConstantSpeedPropagationDelayModel> delay =
+        CreateObject<ConstantSpeedPropagationDelayModel>();
+
+    Ptr<YansWifiChannel> channel = CreateObject<YansWifiChannel>();
+    channel->SetPropagationDelayModel(delay);
+    channel->SetPropagationLossModel(matrixLoss);
+    wifiPhy.SetChannel(channel);
 
     // Add a mac and disable rate control
     WifiMacHelper wifiMac;
@@ -197,21 +209,9 @@ main(int argc, char* argv[])
     // Set it to adhoc mode
     wifiMac.SetType("ns3::AdhocWifiMac");
     NetDeviceContainer devices = wifi.Install(wifiPhy, wifiMac, c.Get(0));
-    // Setting RxSensitivity to 0 dBm will disable the two sending devices from detecting
-    // received signals, so that they do not back off
-    wifiPhy.Set("RxSensitivity", DoubleValue(0));
-    // We use the TxGain parameter on each sender to control the received signal power.
-    // The transmit power is roughly 16 dBm.  The signal attenuation from both senders to
-    // the receiving device is 106.7 dB (100 meters at this frequency, based on the
-    // LogDistancePropagationLossModel).  We want the receive signal strength to be
-    // Prss dBm.  We therefore want to solve for the gain as follows:
-    // 16 dBm + TxGain - propagationLoss = Prss (dBm)
-    // Working backwards, TxGain = Prss (dBm) - 16 dB + 106.7 dB = Prss (dBm) + 90.7 dB
-    dB_u powerOffset{90.7};
-    wifiPhy.Set("TxGain", DoubleValue(Prss + powerOffset));
+    
     devices.Add(wifi.Install(wifiPhy, wifiMac, c.Get(1)));
-    // Repeat for the interferer
-    wifiPhy.Set("TxGain", DoubleValue(Irss + powerOffset));
+
     devices.Add(wifi.Install(wifiPhy, wifiMac, c.Get(2)));
 
     MobilityHelper mobility;
@@ -222,6 +222,22 @@ main(int argc, char* argv[])
     mobility.SetPositionAllocator(positionAlloc);
     mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
     mobility.Install(c);
+
+    // Configure deterministic received powers at the receiver (node 0) by setting
+    // per-link losses in the MatrixPropagationLossModel.
+    //
+    // RxPower(dBm) = TxPower(dBm) - Loss(dB)
+    // => Loss(dB) = TxPower(dBm) - RxPower(dBm)
+    Ptr<MobilityModel> rxMob = c.Get(0)->GetObject<MobilityModel>();
+    Ptr<MobilityModel> txMob = c.Get(1)->GetObject<MobilityModel>();
+    Ptr<MobilityModel> intMob = c.Get(2)->GetObject<MobilityModel>();
+
+    matrixLoss->SetLoss(txMob, rxMob, txPowerDbm - Prss);
+    matrixLoss->SetLoss(intMob, rxMob, txPowerDbm - Irss);
+    // Set reverse directions too, to avoid any ambiguity.
+    matrixLoss->SetLoss(rxMob, txMob, txPowerDbm - Prss);
+    matrixLoss->SetLoss(rxMob, intMob, txPowerDbm - Irss);
+
 
     InternetStackHelper internet;
     internet.Install(c);
