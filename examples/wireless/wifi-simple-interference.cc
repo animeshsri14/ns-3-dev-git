@@ -76,11 +76,11 @@
 #include "ns3/double.h"
 #include "ns3/internet-stack-helper.h"
 #include "ns3/ipv4-address-helper.h"
-#include "ns3/propagation-loss-model.h"
-#include "ns3/propagation-delay-model.h"
 #include "ns3/log.h"
 #include "ns3/mobility-helper.h"
 #include "ns3/mobility-model.h"
+#include "ns3/propagation-delay-model.h"
+#include "ns3/propagation-loss-model.h"
 #include "ns3/ssid.h"
 #include "ns3/string.h"
 #include "ns3/yans-wifi-channel.h"
@@ -209,7 +209,7 @@ main(int argc, char* argv[])
     // Set it to adhoc mode
     wifiMac.SetType("ns3::AdhocWifiMac");
     NetDeviceContainer devices = wifi.Install(wifiPhy, wifiMac, c.Get(0));
-    
+
     devices.Add(wifi.Install(wifiPhy, wifiMac, c.Get(1)));
 
     devices.Add(wifi.Install(wifiPhy, wifiMac, c.Get(2)));
@@ -238,6 +238,11 @@ main(int argc, char* argv[])
     matrixLoss->SetLoss(rxMob, txMob, txPowerDbm - Prss);
     matrixLoss->SetLoss(rxMob, intMob, txPowerDbm - Irss);
 
+    // Prevent the transmitter and interferer from sensing each other.
+    // This preserves the intended "forced overlap" experiment.
+    constexpr double txIntLossDb = 200.0;
+    matrixLoss->SetLoss(txMob, intMob, txIntLossDb);
+    matrixLoss->SetLoss(intMob, txMob, txIntLossDb);
 
     InternetStackHelper internet;
     internet.Install(c);
