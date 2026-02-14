@@ -138,7 +138,7 @@ GenerateTraffic(Ptr<Socket> socket, uint32_t pktSize)
 int
 main(int argc, char* argv[])
 {
-    std::string phyMode{"DsssRate1Mbps"};
+    std::string phyMode{"OfdmRate6Mbps"};
     dBm_u Prss{-80};
     dBm_u Irss{-95};
     Time delta{"0ns"};
@@ -172,7 +172,7 @@ main(int argc, char* argv[])
     {
         WifiHelper::EnableLogComponents(); // Turn on all Wifi logging
     }
-    wifi.SetStandard(WIFI_STANDARD_80211b);
+    wifi.SetStandard(WIFI_STANDARD_80211a);
 
     YansWifiPhyHelper wifiPhy;
 
