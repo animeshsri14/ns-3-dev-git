@@ -162,6 +162,22 @@ main(int argc, char* argv[])
     cmd.AddValue("verbose", "turn on all WifiNetDevice log components", verbose);
     cmd.Parse(argc, argv);
 
+    // These are not enforced as errors,
+    //  because this example is intended to allow controlled experimentation.
+    if (Prss > -10.0 || Prss < -110.0)
+    {
+        NS_LOG_WARN("Primary RSS " << Prss << " dBm is outside typical Wi-Fi ranges");
+    }
+    if (Irss > -10.0 || Irss < -110.0)
+    {
+        NS_LOG_WARN("Interferer RSS " << Irss << " dBm is outside typical Wi-Fi ranges");
+    }
+    if (Irss > Prss)
+    {
+        NS_LOG_WARN("Interferer RSS " << Irss << " dBm is stronger than primary RSS " << Prss
+                                      << " dBm");
+    }
+
     // Fix non-unicast data rate to be the same as that of unicast
     Config::SetDefault("ns3::WifiRemoteStationManager::NonUnicastMode", StringValue(phyMode));
 
