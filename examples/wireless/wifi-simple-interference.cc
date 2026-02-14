@@ -5,13 +5,18 @@
  *
  */
 
-// This script configures three nodes on an 802.11b physical layer, with
-// 802.11b NICs in adhoc mode.  There is a transmitter, receiver, and
-// interferer.  The transmitter sends one packet to the receiver and
-// the receiver receives it with a certain configurable RSS (by default,
-// -80 dBm).  The interferer does not do carrier sense and also sends
-// the packet to interfere with the primary packet.  The channel model
-// is clear channel.
+// This script configures three nodes using an 802.11a OFDM physical layer
+// with ad hoc MAC.  There is a transmitter, receiver, and interferer.
+// The transmitter sends one packet to the receiver and the receiver
+// receives it with a configurable received power (by default, -80 dBm).
+// The interferer transmits a packet at a configurable time offset to
+// overlap with the primary transmission at the receiver.
+//
+// A MatrixPropagationLossModel is used to configure deterministic received
+// powers (Prss/Irss) at the receiver, independent of distance.  A large loss
+// is configured between the transmitter and interferer so that they do not
+// carrier-sense each other, preserving the intended "forced overlap"
+// experiment.
 //
 // Therefore, at the receiver, the reception looks like this:
 //
